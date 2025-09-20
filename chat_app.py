@@ -9,19 +9,19 @@ st.caption("A simple and friendly chat using Google's Gemini Flash model")
 # --- 2. Sidebar for Settings ---
 with st.sidebar:
     st.subheader("Settings")
-    google_api_key = st.text_input("Google AI API Key", type="password")
     reset_button = st.button("Reset Conversation", help="Clear all messages and start fresh")
 
 # --- 3. API Key and Model Initialization ---
-if not google_api_key:
-    st.info("Please add your Google AI API key in the sidebar to start chatting.", icon="🗝️")
-    st.stop()
-
-# --- PERBAIKAN 2: Konfigurasi API key dengan cara yang benar ---
 try:
-    genai.configure(api_key=google_api_key)
+    # Ambil API key langsung dari Streamlit Secrets
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+except KeyError:
+    # Error ini untuk Anda (developer) jika lupa mengatur secrets
+    st.error("Kunci API Google tidak ditemukan. Harap tambahkan ke 'Secrets' aplikasi Anda.")
+    st.stop()
 except Exception as e:
-    st.error(f"Invalid API Key or configuration error: {e}")
+    # Error untuk masalah lain terkait API key
+    st.error(f"Terjadi kesalahan saat mengonfigurasi API: {e}")
     st.stop()
 
 # --- PERBAIKAN 3: Buat model dan chat session dengan cara yang benar ---

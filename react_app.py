@@ -16,52 +16,39 @@ st.caption("A simple and friendly chat using LangGraph with Google's Gemini mode
 with st.sidebar:
     # Add a subheader to organize the settings
     st.subheader("Settings")
-    
-    # Create a text input field for the Google AI API Key.
-    # 'type="password"' hides the key as the user types it.
-    google_api_key = st.text_input("Google AI API Key", type="password")
-    
+        
     # Create a button to reset the conversation.
     # 'help' provides a tooltip that appears when hovering over the button.
     reset_button = st.button("Reset Conversation", help="Clear all messages and start fresh")
 
 # --- 3. API Key and Agent Initialization ---
 
-# Check if the user has provided an API key.
-# If not, display an informational message and stop the app from running further.
-if not google_api_key:
-    st.info("Please add your Google AI API key in the sidebar to start chatting.", icon="🗝️")
-    st.stop()
-
-# This block of code handles the creation of the LangGraph agent.
-# It's designed to be efficient: it only creates a new agent if one doesn't exist
-# or if the user has changed the API key in the sidebar.
-
-# We use `st.session_state` which is Streamlit's way of "remembering" variables
-# between user interactions (like sending a message or clicking a button).
-if ("agent" not in st.session_state) or (getattr(st.session_state, "_last_key", None) != google_api_key):
+# Hanya buat agen baru jika belum ada di session state
+if "agent" not in st.session_state:
     try:
-        # Initialize the LLM with the API key
+        # Ambil API key langsung dari Streamlit Secrets
+        # Pastikan nama "GOOGLE_API_KEY" sama dengan yang ada di Secrets Anda
+        api_key_from_secrets = st.secrets["GOOGLE_API_KEY"]
+        
+        # Inisialisasi LLM dengan API key dari secrets
         llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
-            google_api_key=google_api_key,
+            google_api_key=api_key_from_secrets,
             temperature=0.7
         )
         
-        # Create a simple ReAct agent with the LLM
+        # Buat ReAct agent
         st.session_state.agent = create_react_agent(
             model=llm,
-            tools=[],  # No tools for this simple example
+            tools=[], 
             prompt="You are a helpful, friendly assistant. Respond concisely and clearly."
         )
-        
-        # Store the new key in session state to compare against later.
-        st.session_state._last_key = google_api_key
-        # Since the key changed, we must clear the old message history.
-        st.session_state.pop("messages", None)
+
+    except KeyError:
+        st.error("Kunci API Google tidak ditemukan di Secrets. Harap tambahkan terlebih dahulu.")
+        st.stop()
     except Exception as e:
-        # If the key is invalid, show an error and stop.
-        st.error(f"Invalid API Key or configuration error: {e}")
+        st.error(f"Terjadi kesalahan saat mengonfigurasi agen: {e}")
         st.stop()
 
 # --- 4. Chat History Management ---

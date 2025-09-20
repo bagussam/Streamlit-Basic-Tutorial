@@ -1,10 +1,10 @@
 # Import the necessary libraries
-import streamlit as st  # For creating the web app interface
+import streamlit as st  # For creating the web app interface
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI  # For interacting with Google Gemini via LangChain
-from langgraph.prebuilt import create_react_agent  # For creating a ReAct agent
-from langchain_core.messages import HumanMessage, AIMessage  # For message formatting
-from langchain_core.tools import tool  # For creating tools
+from langchain_google_genai import ChatGoogleGenerativeAI  # For interacting with Google Gemini via LangChain
+from langgraph.prebuilt import create_react_agent  # For creating a ReAct agent
+from langchain_core.messages import HumanMessage, AIMessage  # For message formatting
+from langchain_core.tools import tool  # For creating tools
 
 # Import our database tools
 from database_react_tools_app import text_to_sql, init_database, get_database_info
@@ -19,68 +19,61 @@ st.caption("A chatbot that can answer questions about sales data using SQL")
 
 # Create a sidebar section for app settings using 'with st.sidebar:'
 with st.sidebar:
-    # Add a subheader to organize the settings
-    st.subheader("Settings")
-    
-    # Create a text input field for the Google AI API Key.
-    # 'type="password"' hides the key as the user types it.
-    google_api_key = st.text_input("Google AI API Key", type="password")
-    
-    # Create a button to reset the conversation.
-    # 'help' provides a tooltip that appears when hovering over the button.
-    reset_button = st.button("Reset Conversation", help="Clear all messages and start fresh")
-    
-    # Add a button to initialize the database
-    init_db_button = st.button("Initialize Database", help="Create and populate the database with sample data")
-    
-    # Initialize database if button is clicked
-    if init_db_button:
-        with st.spinner("Initializing database..."):
+    # Add a subheader to organize the settings
+    st.subheader("Settings")
+    
+    # Create a button to reset the conversation.
+    # 'help' provides a tooltip that appears when hovering over the button.
+    reset_button = st.button("Reset Conversation", help="Clear all messages and start fresh")
+
+# --- 3. Automatic Initialization (API Key and Database) ---
+
+# Initialize Database automatically on first run
+if "db_initialized" not in st.session_state:
+    with st.spinner("Initializing database..."):
+        try:
             result = init_database()
-            st.success(result)
+            st.session_state.db_initialized = True
+            print(f"Database initialization result: {result}") # Logs for debugging
+        except Exception as e:
+            st.error(f"Failed to initialize the database: {e}")
+            st.stop()
 
-# --- 3. API Key and Agent Initialization ---
-
-# Check if the user has provided an API key.
-# If not, display an informational message and stop the app from running further.
-if not google_api_key:
-    st.info("Please add your Google AI API key in the sidebar to start chatting.", icon="🗝️")
-    st.stop()
-
-# Define the tools using the LangChain tool decorator
-@tool
-def execute_sql(sql_query: str):
-    """
-    Execute a SQL query against the sales database.
-    
-    Args:
-        sql_query: The SQL query to execute. Must be a valid SQL query string.
-              For example: "SELECT * FROM customers", "SELECT p.name, SUM(si.quantity) as total_sold FROM sale_items si JOIN products p ON si.product_id = p.product_id GROUP BY p.product_id ORDER BY total_sold DESC", etc.
-    """
-    result = text_to_sql(sql_query)
-    # Format the result to clearly show the executed SQL query
-    formatted_result = f"```sql\n{sql_query}\n```\n\nQuery Results:\n{result}"
-    return formatted_result
-
-@tool
-def get_schema_info():
-    """
-    Get information about the database schema and sample data to help with query construction.
-    This tool returns the schema of all tables and sample data (first 3 rows) from each table.
-    Use this tool before writing SQL queries to understand the database structure.
-    """
-    return get_database_info()
-
-# This block of code handles the creation of the LangGraph agent.
-# It's designed to be efficient: it only creates a new agent if one doesn't exist
-# or if the user has changed the API key in the sidebar.
-if ("agent" not in st.session_state) or (getattr(st.session_state, "_last_key", None) != google_api_key):
+# Initialize the AI Agent automatically on first run
+if "agent" not in st.session_state:
     try:
-        # Initialize the LLM with the API key
+        # Load API key from Streamlit Secrets
+        google_api_key = st.secrets["GOOGLE_API_KEY"]
+
+        # Define the tools using the LangChain tool decorator
+        @tool
+        def execute_sql(sql_query: str):
+            """
+            Execute a SQL query against the sales database.
+            
+            Args:
+                sql_query: The SQL query to execute. Must be a valid SQL query string.
+                           For example: "SELECT * FROM customers", "SELECT p.name, SUM(si.quantity) as total_sold FROM sale_items si JOIN products p ON si.product_id = p.product_id GROUP BY p.product_id ORDER BY total_sold DESC", etc.
+            """
+            result = text_to_sql(sql_query)
+            # Format the result to clearly show the executed SQL query
+            formatted_result = f"```sql\n{sql_query}\n```\n\nQuery Results:\n{result}"
+            return formatted_result
+
+        @tool
+        def get_schema_info():
+            """
+            Get information about the database schema and sample data to help with query construction.
+            This tool returns the schema of all tables and sample data (first 3 rows) from each table.
+            Use this tool before writing SQL queries to understand the database structure.
+            """
+            return get_database_info()
+
+        # Initialize the LLM with the API key from secrets
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             google_api_key=google_api_key,
-            temperature=0.2  # Lower temperature for more deterministic responses
+            temperature=0.2  # Lower temperature for more deterministic responses
         )
         
         # Create a ReAct agent with the LLM and our SQL tools
@@ -110,15 +103,14 @@ if ("agent" not in st.session_state) or (getattr(st.session_state, "_last_key", 
             Do not ask the user to provide SQL queries.
             """
         )
-        
-        # Store the new key in session state to compare against later.
-        st.session_state._last_key = google_api_key
-        # Since the key changed, we must clear the old message history.
-        st.session_state.pop("messages", None)
-    except Exception as e:
-        # If the key is invalid, show an error and stop.
-        st.error(f"Invalid API Key or configuration error: {e}")
+    
+    except KeyError:
+        st.error("Google API Key not found in Streamlit Secrets. Please add it to continue.")
         st.stop()
+    except Exception as e:
+        st.error(f"Error initializing the AI agent: {e}")
+        st.stop()
+
 
 # --- 4. Chat History Management ---
 
@@ -128,9 +120,9 @@ if "messages" not in st.session_state:
 
 # Handle the reset button click.
 if reset_button:
-    # If the reset button is clicked, clear the agent and message history from memory.
-    st.session_state.pop("agent", None)
-    st.session_state.pop("messages", None)
+    # If the reset button is clicked, clear the message history.
+    # We no longer need to clear the agent, as it's initialized once per session.
+    st.session_state.messages = []
     # st.rerun() tells Streamlit to refresh the page from the top.
     st.rerun()
 
@@ -205,11 +197,7 @@ if prompt:
     # 4. Display the assistant's response.
     with st.chat_message("assistant"):
         # Check if we have a SQL query from the tool message
-        sql_query = None
-        if hasattr(st.session_state, "last_sql_query"):
-            sql_query = st.session_state.last_sql_query
-            # Clear it after use
-            del st.session_state.last_sql_query
+        sql_query = st.session_state.pop("last_sql_query", None)
 
         # Display the extracted SQL query in a code block if found
         if sql_query:

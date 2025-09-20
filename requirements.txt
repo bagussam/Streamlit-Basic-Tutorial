@@ -3,6 +3,6 @@ pandas
 numpy
 matplotlib
 google-generativeai
-langchain-google-genai>=2.1.0
-langgraph>=0.0.30
-langchain>=0.1.0
+langchain-google-genai
+langgraph
+langchain

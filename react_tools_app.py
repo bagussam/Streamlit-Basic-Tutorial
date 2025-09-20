@@ -1,10 +1,10 @@
 # Import the necessary libraries
-import streamlit as st  # For creating the web app interface
+import streamlit as st # For creating the web app interface
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI  # For interacting with Google Gemini via LangChain
-from langgraph.prebuilt import create_react_agent  # For creating a ReAct agent
-from langchain_core.messages import HumanMessage, AIMessage  # For message formatting
-from langchain_core.tools import tool  # For creating tools
+from langchain_google_genai import ChatGoogleGenerativeAI # For interacting with Google Gemini via LangChain
+from langgraph.prebuilt import create_react_agent # For creating a ReAct agent
+from langchain_core.messages import HumanMessage, AIMessage # For message formatting
+from langchain_core.tools import tool # For creating tools
 
 # Import our database tools
 from database_react_tools_app import text_to_sql, init_database, get_database_info
@@ -19,12 +19,12 @@ st.caption("A chatbot that can answer questions about sales data using SQL")
 
 # Create a sidebar section for app settings using 'with st.sidebar:'
 with st.sidebar:
-    # Add a subheader to organize the settings
-    st.subheader("Settings")
-    
-    # Create a button to reset the conversation.
-    # 'help' provides a tooltip that appears when hovering over the button.
-    reset_button = st.button("Reset Conversation", help="Clear all messages and start fresh")
+  # Add a subheader to organize the settings
+  st.subheader("Settings")
+  
+  # Create a button to reset the conversation.
+  # 'help' provides a tooltip that appears when hovering over the button.
+  reset_button = st.button("Reset Conversation", help="Clear all messages and start fresh")
 
 # --- 3. Automatic Initialization (API Key and Database) ---
 
@@ -71,9 +71,9 @@ if "agent" not in st.session_state:
 
         # Initialize the LLM with the API key from secrets
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             google_api_key=google_api_key,
-            temperature=0.2  # Lower temperature for more deterministic responses
+            temperature=0.2 # Lower temperature for more deterministic responses
         )
         
         # Create a ReAct agent with the LLM and our SQL tools
